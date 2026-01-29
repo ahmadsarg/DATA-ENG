@@ -437,3 +437,183 @@ CREATE TABLE IF NOT EXISTS `project.dataset.condition_pricing_attributes` (
 --     updated_at = CURRENT_TIMESTAMP
 -- WHERE condition_id = :condition_id
 --   AND is_current = TRUE;
+
+
+-- ============================================
+-- PRACTICAL EXAMPLE WITH DATA
+-- ============================================
+
+-- ----------------------------------------
+-- STEP 1: Insert reference data
+-- ----------------------------------------
+INSERT INTO suppliers (id, name, code) VALUES
+(1, 'Acme Corporation', 'ACME'),
+(2, 'Global Foods Inc', 'GFOOD');
+
+INSERT INTO catalog_categories (id, name, parent_id) VALUES
+(1, 'Electronics', NULL),
+(2, 'Food & Beverages', NULL),
+(3, 'Smartphones', 1),
+(4, 'Dairy Products', 2);
+
+INSERT INTO pricing_attributes (id, name, catalog_category_id) VALUES
+(1, 'Premium Brand', 1),
+(2, 'Bulk Purchase', NULL),
+(3, 'Seasonal Item', 2),
+(4, 'New Product Launch', NULL);
+
+-- ----------------------------------------
+-- STEP 2: Create initial conditions (January 2024)
+-- ----------------------------------------
+-- Supplier 1 gets a 10% discount on Premium Brand items
+INSERT INTO conditions (
+    condition_id, type, value, cumulability, settlement_mode,
+    include_in_net_price, business_valid_from, business_valid_to,
+    position_order, supplier_id, record_valid_from, record_valid_to,
+    is_current, source_system
+) VALUES (
+    'COND-001', 'percentage', 10.00, 'progressive', 'invoice',
+    FALSE, '2024-01-01', '2024-12-31',
+    1, 1, '2024-01-01 09:00:00', '9999-12-31 23:59:59',
+    TRUE, 'UI'
+);
+
+-- Link condition to pricing attribute
+INSERT INTO condition_pricing_attributes (condition_id, attribute_id)
+VALUES ('COND-001', 1);
+
+-- ----------------------------------------
+-- STEP 3: Update condition in June 2024 (discount increased to 15%)
+-- ----------------------------------------
+-- Step 3a: Close the current version
+UPDATE conditions
+SET record_valid_to = '2024-06-15 10:30:00',
+    is_current = FALSE,
+    updated_at = '2024-06-15 10:30:00'
+WHERE condition_id = 'COND-001'
+  AND is_current = TRUE;
+
+-- Step 3b: Insert new version with updated discount
+INSERT INTO conditions (
+    condition_id, type, value, cumulability, settlement_mode,
+    include_in_net_price, business_valid_from, business_valid_to,
+    position_order, supplier_id, record_valid_from, record_valid_to,
+    is_current, source_system
+) VALUES (
+    'COND-001', 'percentage', 15.00, 'progressive', 'invoice',
+    FALSE, '2024-01-01', '2024-12-31',
+    1, 1, '2024-06-15 10:30:00', '9999-12-31 23:59:59',
+    TRUE, 'UI'
+);
+
+-- ----------------------------------------
+-- STEP 4: Another update in October 2024 (discount changed to 12%, type changed)
+-- ----------------------------------------
+-- Close current version
+UPDATE conditions
+SET record_valid_to = '2024-10-01 14:00:00',
+    is_current = FALSE,
+    updated_at = '2024-10-01 14:00:00'
+WHERE condition_id = 'COND-001'
+  AND is_current = TRUE;
+
+-- Insert new version
+INSERT INTO conditions (
+    condition_id, type, value, cumulability, settlement_mode,
+    include_in_net_price, business_valid_from, business_valid_to,
+    position_order, supplier_id, record_valid_from, record_valid_to,
+    is_current, source_system
+) VALUES (
+    'COND-001', 'percentage', 12.00, 'additive', 'credit_note',
+    TRUE, '2024-01-01', '2025-06-30',
+    1, 1, '2024-10-01 14:00:00', '9999-12-31 23:59:59',
+    TRUE, 'UI'
+);
+
+
+-- ============================================
+-- QUERY RESULTS
+-- ============================================
+
+-- ----------------------------------------
+-- RESULT 1: View all historical versions of COND-001
+-- ----------------------------------------
+-- SELECT condition_sk, condition_id, value, type, cumulability,
+--        settlement_mode, record_valid_from, record_valid_to, is_current
+-- FROM conditions
+-- WHERE condition_id = 'COND-001'
+-- ORDER BY record_valid_from;
+
+-- RESULT:
+-- +-------------+--------------+-------+------------+--------------+-----------------+---------------------+---------------------+------------+
+-- | condition_sk| condition_id | value | type       | cumulability | settlement_mode | record_valid_from   | record_valid_to     | is_current |
+-- +-------------+--------------+-------+------------+--------------+-----------------+---------------------+---------------------+------------+
+-- | 1           | COND-001     | 10.00 | percentage | progressive  | invoice         | 2024-01-01 09:00:00 | 2024-06-15 10:30:00 | FALSE      |
+-- | 2           | COND-001     | 15.00 | percentage | progressive  | invoice         | 2024-06-15 10:30:00 | 2024-10-01 14:00:00 | FALSE      |
+-- | 3           | COND-001     | 12.00 | percentage | additive     | credit_note     | 2024-10-01 14:00:00 | 9999-12-31 23:59:59 | TRUE       |
+-- +-------------+--------------+-------+------------+--------------+-----------------+---------------------+---------------------+------------+
+
+-- ----------------------------------------
+-- RESULT 2: Point-in-time query - What was the discount on March 15, 2024?
+-- ----------------------------------------
+-- SELECT value, type, cumulability, settlement_mode
+-- FROM conditions
+-- WHERE condition_id = 'COND-001'
+--   AND record_valid_from <= '2024-03-15'
+--   AND record_valid_to > '2024-03-15';
+
+-- RESULT:
+-- +-------+------------+--------------+-----------------+
+-- | value | type       | cumulability | settlement_mode |
+-- +-------+------------+--------------+-----------------+
+-- | 10.00 | percentage | progressive  | invoice         |
+-- +-------+------------+--------------+-----------------+
+-- Answer: 10% discount, applied progressively on invoice
+
+-- ----------------------------------------
+-- RESULT 3: Point-in-time query - What was the discount on August 1, 2024?
+-- ----------------------------------------
+-- SELECT value, type, cumulability, settlement_mode
+-- FROM conditions
+-- WHERE condition_id = 'COND-001'
+--   AND record_valid_from <= '2024-08-01'
+--   AND record_valid_to > '2024-08-01';
+
+-- RESULT:
+-- +-------+------------+--------------+-----------------+
+-- | value | type       | cumulability | settlement_mode |
+-- +-------+------------+--------------+-----------------+
+-- | 15.00 | percentage | progressive  | invoice         |
+-- +-------+------------+--------------+-----------------+
+-- Answer: 15% discount (was increased in June)
+
+-- ----------------------------------------
+-- RESULT 4: Get current condition (today)
+-- ----------------------------------------
+-- SELECT value, type, cumulability, settlement_mode, include_in_net_price
+-- FROM conditions
+-- WHERE condition_id = 'COND-001'
+--   AND is_current = TRUE;
+
+-- RESULT:
+-- +-------+------------+--------------+-----------------+----------------------+
+-- | value | type       | cumulability | settlement_mode | include_in_net_price |
+-- +-------+------------+--------------+-----------------+----------------------+
+-- | 12.00 | percentage | additive     | credit_note     | TRUE                 |
+-- +-------+------------+--------------+-----------------+----------------------+
+-- Answer: 12% discount, additive cumulability, settled via credit note
+
+-- ----------------------------------------
+-- RESULT 5: Timeline visualization of COND-001
+-- ----------------------------------------
+--
+--  Jan 2024          Jun 2024           Oct 2024          Today
+--     |                 |                  |                |
+--     |   VALUE: 10%    |   VALUE: 15%     |   VALUE: 12%   |
+--     |   Type: %       |   Type: %        |   Type: %      |
+--     |   Cumul: prog   |   Cumul: prog    |   Cumul: add   |
+--     |   Settle: inv   |   Settle: inv    |   Settle: CN   |
+--     |---------------->|----------------->|--------------->|
+--     |   Version 1     |   Version 2      |   Version 3    |
+--     |   (CLOSED)      |   (CLOSED)       |   (CURRENT)    |
+--
