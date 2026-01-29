@@ -24,8 +24,6 @@ CREATE TABLE IF NOT EXISTS suppliers (
     updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_suppliers_code ON suppliers(code);
-
 -- --------------------------------------------
 -- Catalog Categories Table (Reference Table)
 -- --------------------------------------------
@@ -38,8 +36,6 @@ CREATE TABLE IF NOT EXISTS catalog_categories (
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_catalog_categories_parent ON catalog_categories(parent_id);
 
 -- --------------------------------------------
 -- Conditions Table (SCD Type 2)
@@ -115,24 +111,6 @@ CREATE TABLE IF NOT EXISTS conditions (
     updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Index for finding current version of a condition by natural key
-CREATE INDEX idx_conditions_natural_key ON conditions(condition_id);
-
--- Index for quickly finding all current records
-CREATE INDEX idx_conditions_current ON conditions(is_current) WHERE is_current = TRUE;
-
--- Index for point-in-time queries
-CREATE INDEX idx_conditions_record_validity ON conditions(record_valid_from, record_valid_to);
-
--- Index for listing conditions by supplier ordered by position (current only)
-CREATE INDEX idx_conditions_supplier_position ON conditions(supplier_id, position_order) WHERE is_current = TRUE;
-
--- Index for business validity date filtering
-CREATE INDEX idx_conditions_business_validity ON conditions(business_valid_from, business_valid_to);
-
--- Index for filtering by type
-CREATE INDEX idx_conditions_type ON conditions(type);
-
 -- --------------------------------------------
 -- Pricing Attributes Table
 -- --------------------------------------------
@@ -149,9 +127,6 @@ CREATE TABLE IF NOT EXISTS pricing_attributes (
     created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE INDEX idx_pricing_attributes_category ON pricing_attributes(catalog_category_id);
-CREATE INDEX idx_pricing_attributes_name ON pricing_attributes(name);
 
 -- --------------------------------------------
 -- Condition Pricing Attributes (Junction Table)
@@ -173,12 +148,6 @@ CREATE TABLE IF NOT EXISTS condition_pricing_attributes (
     -- Audit Column
     created_at              TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
--- Index for looking up attributes by condition
-CREATE INDEX idx_cpa_condition ON condition_pricing_attributes(condition_id);
-
--- Index for looking up conditions by attribute
-CREATE INDEX idx_cpa_attribute ON condition_pricing_attributes(attribute_id);
 
 
 -- ============================================
